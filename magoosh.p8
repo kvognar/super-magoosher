@@ -10,6 +10,9 @@ b={
   z=4,
   x=5
 }
+cam={x=0, y=0, watermark=128}
+score=0
+
 function _init()
   game_states={title=title, game=game}
 
@@ -17,7 +20,7 @@ function _init()
   state:init()
 end
 
-function _update()
+function _update60()
   t+=1
   state:update()
 end
@@ -38,23 +41,68 @@ function title:draw()
   print(self.name, 20, self.offset+sin(t/3000))
 end
 
+-- game logic
 game={}
 function game:init()
-  self.player=player:new({x=50,y=50})
-  self.actors={self.player, box}
+  self.player=player:new({x=50,y=128})
+  player.dy=-6
+  self.actors={self.player}
+  self.boopers={}
+  for i=0,8 do
+    local x = rnd(100)+10
+    local y = rnd(64)
+    self:make_booper(x, y)
+  end
 end
 function game:update()
   foreach(self.actors, function(actor)
     actor:update()
   end)
+  foreach(self.boopers, function(booper)
+    if self.player:collide(booper) then
+      self.player:boop(booper.booping)
+      del(self.boopers, booper)
+      score+=1
+    end
+  end)
+  self:booper_sweep()
 end
 function game:draw()
+  rectfill(0+cam.x,0+cam.y,255+cam.x,255+cam.y,6)
+  print(#self.boopers, 0+cam.x, 0+cam.y, 0)
+  print(self.player.dy, 0+cam.x, 8+cam.y, 0)
+  print(score, 0+cam.x, 16+cam.y, 3)
   foreach(self.actors,function(actor)
     actor:draw()
   end)
-  print(self.player:collide(box))
+  foreach(self.boopers, function(booper)
+    booper:draw()
+  end)
+  if self.player.y - cam.watermark < 80 then
+    cam.y=self.player.y-80
+    cam.watermark=cam.y
+    camera(0, cam.y)
+  end
+end
+function game:make_booper(x, y)
+  local booper = booper:new({
+    x=x,
+    y=y
+  })
+  add(self.boopers, booper)
+end
+function game:booper_sweep()
+  foreach(self.boopers, function(booper)
+    if booper.y > self.player.y+128 then
+      del(self.boopers, booper)
+    end
+  end)
+  while #self.boopers < 10 do
+    self:make_booper(rnd(110)+10, cam.y-60)
+  end
 end
 
+-- entities
 entity = {x=0,y=0,dx=0,dy=0,damping=1,w=5,h=8,spr_w=1,spr_h=1,frames={},frame_index=1,frametime=1,facing_left=false}
 function entity:new(attrs)
   attrs = attrs or {}
@@ -82,10 +130,8 @@ function entity:collide(other)
 end
 
 player=entity:new({
-  gravity=.2,
-})
-box=entity:new({
-  x=60, y=40, w=20, h=20, spr_h=20, spr_w=20
+  w=8, h=8, spr_w=8, spr_h=8,
+  gravity=.1,
 })
 
 function player:update()
@@ -94,6 +140,8 @@ function player:update()
 end
 
 function player:move()
+  self.dy+=self.gravity
+  self.dy=mid(-6, self.dy, 6)
   self.x+=self.dx
   self.y+=self.dy
   self.dx*=self.damping
@@ -110,14 +158,28 @@ function player:process_buttons()
   self.dx=mid(self.dx, -2, 2)
 end
 
-booper=entity:new({
+function player:boop(velocity)
+  self.dy += velocity
+end
 
+booper=entity:new({
+  w=8,
+  h=8,
+  spr_h=1,
+  spr_w=1,
+  booping=-10,
+  current_frames={1},
+  frame_index=1,
+  frames={1}
 })
 
+
 __gfx__
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000003333000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00700700033333700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000033337300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00077000037373300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00700700003733000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000033333300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00700700333333330000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00077000333333730000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00077000373337330000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00700700337373330000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000033733300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000003333000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
