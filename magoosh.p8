@@ -10,7 +10,7 @@ b={
   z=4,
   x=5
 }
-cam={x=0, y=0, watermark=128}
+cam={x=0, y=0, watermark=0}
 score=1
 tests={
   act={
@@ -57,18 +57,17 @@ game={}
 function game:init()
   self.test=tests.act
   self.scores={}
+  self.boost_countdown=300
   foreach(self.test.subjects, function(subject)
     self.scores[subject]=self.test.scores.min
   end)
-  self.player=player:new({x=50,y=128})
+  self.player=player:new({x=60,y=128})
   player.dy=-6
 
   self.actors={self.player}
   self.boopers={}
-  for i=0,8 do
-    local x = rnd(100)+10
-    local y = rnd(64)
-    self:make_booper(x, y)
+  for i=0,5 do
+    self:make_booper(false)
   end
 end
 function game:update()
@@ -76,6 +75,7 @@ function game:update()
     actor:update()
   end)
   foreach(self.boopers, function(booper)
+    booper:update()
     if self.player:collide(booper) then
       self.player:boop(booper.booping)
       del(self.boopers, booper)
@@ -84,28 +84,32 @@ function game:update()
       end
     end
   end)
-  self:booper_sweep()
+  if (t > 60) self:booper_sweep()
+  self:boost_check()
 end
 function game:draw()
-  rectfill(0+cam.x,0+cam.y,255+cam.x,255+cam.y,6)
-  print(#self.boopers, 0+cam.x, 0+cam.y, 0)
-  print(self.player.dy, 0+cam.x, 8+cam.y, 0)
-  self:score_display()
+  local color = 6
+  if (self.player.boosting) color = 12
+  rectfill(0+cam.x,0+cam.y,255+cam.x,255+cam.y, color)
+  -- print(#self.boopers, 0+cam.x, 0+cam.y, 0)
+  -- print(self.player.dy, 0+cam.x, 8+cam.y, 0)
   foreach(self.actors,function(actor)
     actor:draw()
   end)
   foreach(self.boopers, function(booper)
     booper:draw()
   end)
+  if(self.booster) self.booster:draw()
   if self.player.y - cam.watermark < 80 then
     cam.y=self.player.y-80
     cam.watermark=cam.y
     camera(0, cam.y)
   end
+  self:score_display()
+  print(self.boost_countdown, 50, 50+cam.y, 0)
 end
 function game:score_display()
   rectfill(0+cam.x, 0+cam.y, 255+cam.x, 12+cam.y,2)
-  foreach(self.sc)
   local offset=8
   for i=1,#self.test.subjects do
     local subject=self.test.subjects[i]
@@ -117,24 +121,65 @@ function game:score_display()
   -- print(subject_scores.math[score], 1+cam.x,1+cam.y, 7)
 end
 
-function game:make_booper(x, y)
-  local booper = booper:new({
-    x=x,
-    y=y
-  })
+function game:make_booper(moving)
+  local x
+  local y
+  local dx
+  if moving then
+    y=cam.y+rnd(128)
+    if rnd(2) > 1 then
+      x=130
+      dx=-1
+    else
+      x=-10
+      dx=1
+    end
+  else
+    x=rnd(118)
+    y=cam.y-rnd(128)-10
+    dx=0
+  end
+  local booper = booper:new({x=x, y=y, dx=dx})
   local subject=self.test.subjects[flr(rnd(#self.test.subjects)+1)]
-  -- local subject=tests.act.subjects[4]
   booper:init(subject)
   add(self.boopers, booper)
 end
 function game:booper_sweep()
   foreach(self.boopers, function(booper)
-    if booper.y > self.player.y+128 then
+    if booper.y > cam.y+128 or
+    booper.x > 140 or booper.x < -10
+     then
       del(self.boopers, booper)
     end
   end)
-  while #self.boopers < 10 do
-    self:make_booper(rnd(110)+10, cam.y-10)
+  local moving_boopers=0
+  foreach(self.boopers, function(booper)
+    if (booper.dx !=0) moving_boopers+=1
+  end)
+  while moving_boopers<4 do
+    self:make_booper(true)
+    moving_boopers+=1
+  end
+  while #self.boopers < 8 do
+    self:make_booper(false)
+  end
+end
+
+function game:boost_check()
+  if self.booster and self.player:collide(self.booster) then
+    self.player:boost()
+    self.booster=nil
+    self.boost_countdown=300
+  elseif self.booster==nil and self.boost_countdown < 0 then
+    self.booster=booster:new({x=rnd(116)+2,y=cam.y-64})
+  elseif self.player.boosting and self.boost_countdown < 1 then
+      self.player:unboost()
+      self.boost_countdown=600
+  elseif self.booster and self.booster.y > cam.y+150 then
+    self.booster=nil
+    self.boost_countdown=600
+  else
+    self.boost_countdown-=1
   end
 end
 
@@ -171,8 +216,9 @@ player=entity:new({
     rising=12,
     falling=14,
   },
+  min_dy=-4,
   current_frames={12},
-  gravity=.1,
+  gravity=.05,
 })
 
 function player:update()
@@ -196,10 +242,10 @@ end
 
 function player:process_buttons()
   if btn(b.left) then
-    self.dx-=1
+    self.dx-=0.5
     self.facing_left=true
   elseif btn(b.right) then
-    self.dx+=1
+    self.dx+=0.5
     self.facing_left=false
   end
   self.dx*=.8
@@ -207,7 +253,17 @@ function player:process_buttons()
 end
 
 function player:boop(velocity)
-  self.dy += velocity
+  self.dy = max(self.dy+velocity, self.min_dy)
+end
+function player:boost()
+  self.boosting=true
+
+  self.min_dy=-8
+  self.dy=-8
+end
+function player:unboost()
+  self.boosting=false
+  self.min_dy=-4
 end
 
 booper=entity:new({
@@ -215,7 +271,7 @@ booper=entity:new({
   h=8,
   spr_h=1,
   spr_w=1,
-  booping=-6,
+  booping=-4,
   subject=nil,
   frame_index=1,
   frames={
@@ -229,6 +285,29 @@ function booper:init(subject)
   self.current_frames=self.frames[subject]
   self.subject=subject
 end
+function booper:update()
+  if state.player.boosting then
+    if self.x > state.player.x then
+      self.dx = -1
+    else
+      self.dx = 1
+    end
+    if self.y > state.player.y then
+      self.dy = -1
+    else
+      self.dy = 1
+    end
+  end
+  entity.update(self)
+end
+
+booster=entity:new({
+  w=8,
+  h=8,
+  spr_h=1,
+  spr_w=1,
+  current_frames={1}
+})
 
 
 __gfx__
