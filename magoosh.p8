@@ -25,9 +25,9 @@ tests={
 
 
 function _init()
-  game_states={title=title, game=game}
+  game_states={title=title, game=game, results=results}
 
-  state=game_states.game
+  state=game_states.title
   state:init()
 end
 
@@ -40,16 +40,26 @@ function _draw()
   cls()
   state:draw()
 end
+function transition_to(new_state)
+  state=new_state
+  t=0
+  camera()
+  state:init()
+end
 
-title={name="super study", offset= 50}
+title={}
 function title:init()
-  self.offset=50
+  self.name="super magoosher"
+  self.msg="press ❎ to start"
 end
 function title:update()
-
+  if (btnp(b.x)) transition_to(game_states.game)
 end
 function title:draw()
-  print(self.name, 20, self.offset+sin(t/3000))
+  rectfill(0,0,128,128,13)
+  color(7)
+  print(self.name, hcenter(self.name), 40)
+  print(self.msg, hcenter(self.msg), 60)
 end
 
 -- game logic
@@ -79,6 +89,7 @@ function game:update()
   self:boost_check()
   self:update_camera()
   if(btnp(b.z)) self:boost()
+  self:end_check()
 end
 function game:draw()
   local color = 6
@@ -113,6 +124,17 @@ function game:update_camera()
     cam.y=cam.watermark
   end
 end
+function game:end_check()
+  if (not self.game_over) and self.player.y > cam.y+150 then
+    self.game_over=true
+    self.game_over_timer=150
+  elseif self.game_over and self.game_over_timer > 0 then
+    self.game_over_timer-=1
+  elseif self.game_over and self.game_over_timer<=0 then
+    transition_to(game_states.results)
+  end
+end
+
 function game:score_display()
   rectfill(0+cam.x, 0+cam.y, 255+cam.x, 12+cam.y,2)
   local offset=8
@@ -123,7 +145,9 @@ function game:score_display()
     print(self.scores[subject],offset+(4*#subject/2-1)+cam.x,7+cam.y)
     offset+=4*(#self.test.subjects[i]+1)
   end
-  -- print(subject_scores.math[score], 1+cam.x,1+cam.y, 7)
+  if self.game_over then
+    print("game over", cam.y+60,40,7)
+  end
 end
 
 function game:make_booper(moving, onscreen)
@@ -343,6 +367,75 @@ booster=entity:new({
   current_frames={1}
 })
 
+--results!
+results={}
+colleges={}
+colleges[15]="rust college"
+colleges[16]="clark atlanta university"
+colleges[17]="alabama state university"
+colleges[20]="university of texas el paso"
+colleges[24]="michigan state university"
+colleges[26]="miami university"
+colleges[34]="uc berkeley"
+colleges[35]="dartmouth"
+colleges[36]="harvard"
+function results:init()
+  self.acceptances={}
+  self.total_score=0
+  for test,score in pairs(game.scores) do
+    self.total_score+=score
+  end
+  self.total_score=self.total_score/#game.test.subjects
+  -- self.total_score=34
+  for i=0,flr(self.total_score) do
+    if (colleges[i]) add(self.acceptances, colleges[i])
+  end
+
+  self.message={"your act score: " .. self.total_score}
+  if #self.acceptances > 0 then
+    add(self.message, "you got into:")
+    add(self.message, "")
+    foreach(self.acceptances, function(college)
+      add(self.message, college)
+    end)
+  else
+    add(self.message, "")
+    add(self.message, "it's okay--")
+    add(self.message, "lots of schools don't")
+    add(self.message, "require test results anymore!")
+  end
+
+  self.ticker=60
+  self.message_index=0
+end
+
+function results:draw()
+  cls()
+  rectfill(0,0,128,128,1)
+  color(6)
+  for i=1,self.message_index do
+    print(self.message[i], hcenter(self.message[i]), 1+6*i)
+  end
+end
+
+function results:update()
+  self.ticker -=1
+  if self.ticker < 1 and self.message_index < #self.message then
+    self.message_index +=1
+    self.ticker = 40
+  end
+  if self.message_index == #self.message and btnp(b.x) then
+    transition_to(game_states.title)
+  end
+end
+
+function hcenter(s)
+  -- screen center minus the
+  -- string length times the
+  -- pixels in a char's width,
+  -- cut in half
+  return 64-#s*2
+end
 
 __gfx__
 00000000003333000000000000dddd0000dddd0000dddd0000dddd0000dddd000000000000000000000000000000000000333300000000000033330000cccc00
