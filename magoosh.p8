@@ -217,6 +217,10 @@ function game:unboost()
   self.boosting=false
   self.player.min_dy=-4
   self.boost_countdown=600
+  foreach(self.boopers,function(booper)
+    booper.dx=0
+    booper.dy=0
+  end)
 end
 
 
