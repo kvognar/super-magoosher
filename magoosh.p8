@@ -10,7 +10,6 @@ b={
   z=4,
   x=5
 }
-cam={x=0, y=0, watermark=0, speed=2}
 score=1
 tests={
   act={
@@ -65,20 +64,24 @@ end
 -- game logic
 game={}
 function game:init()
+  cam={x=0, y=0, watermark=0, speed=2}
   self.test=tests.act
   self.scores={}
+  self.game_over=false
   self.boost_countdown=300
   foreach(self.test.subjects, function(subject)
     self.scores[subject]=self.test.scores.min
   end)
+
   self.player=player:new({x=60,y=128})
-  player.dy=-4
+  self.player.dy=-4
 
   self.actors={self.player}
   self.boopers={}
   for i=0,5 do
     self:make_booper(false, true)
   end
+  self.booster=nil
 end
 function game:update()
   foreach(self.actors, function(actor)
