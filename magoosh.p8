@@ -74,16 +74,7 @@ function game:update()
   foreach(self.actors, function(actor)
     actor:update()
   end)
-  foreach(self.boopers, function(booper)
-    booper:update()
-    if self.player:collide(booper) then
-      self.player:boop(booper.booping)
-      del(self.boopers, booper)
-      if self.scores[booper.subject] < self.test.scores.max then
-        self.scores[booper.subject]+=self.test.scores.scale
-      end
-    end
-  end)
+  self:boop_check()
   if (t > 60) self:booper_sweep()
   self:boost_check()
 end
@@ -164,7 +155,20 @@ function game:booper_sweep()
     self:make_booper(false)
   end
 end
-
+function game:boop_check()
+  foreach(self.boopers, function(booper)
+    booper:update()
+  end)
+  foreach(self.boopers, function(booper)
+    if (self.player.dy > 0 or self.player.boosting) and self.player:collide(booper) then
+      self.player:boop(booper.booping)
+      del(self.boopers, booper)
+      if self.scores[booper.subject] < self.test.scores.max then
+        self.scores[booper.subject]+=self.test.scores.scale
+      end
+    end
+  end)
+end
 function game:boost_check()
   if self.booster and self.player:collide(self.booster) then
     self.player:boost()
